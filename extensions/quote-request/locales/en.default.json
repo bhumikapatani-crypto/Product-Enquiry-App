@@ -1,0 +1,16 @@
+{
+  "quote_request": {
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "company": "Company",
+    "quantity": "Quantity",
+    "message": "Message",
+    "file": "Attachment",
+    "file_help": "PDF, image, Word, or Excel up to {{ size }} MB.",
+    "cancel": "Cancel",
+    "close": "Close quote request",
+    "sending": "Sending…",
+    "hidden_editor": "The quote button is hidden by its current visibility settings."
+  }
+}

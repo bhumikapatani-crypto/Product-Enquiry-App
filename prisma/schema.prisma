@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  CLOSED
+}
+
+enum EnquirySource {
+  STOREFRONT
+  ADMIN
+  API
+}
+
+enum VisibilityMode {
+  ALL_PRODUCTS
+  SELECTED_PRODUCTS
+  SELECTED_COLLECTIONS
+  TAGGED_PRODUCTS
+  DISABLED
+}
+
+enum ActivityType {
+  CREATED
+  STATUS_CHANGED
+  NOTE_ADDED
+  NOTE_UPDATED
+  NOTE_DELETED
+  EMAIL_SENT
+  EMAIL_FAILED
+  FILE_ATTACHED
+  PRODUCT_UPDATED
+}
+
+enum EmailKind {
+  ADMIN_NOTIFICATION
+  CUSTOMER_CONFIRMATION
+  QUOTE
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// Shopify session records are managed by PrismaSessionStorage. Keep field names
+/// compatible with @shopify/shopify-app-session-storage-prisma.
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+  @@index([expires])
+}
+
+/// One row per Shopify installation. Domain is retained after uninstall so that
+/// historical enquiries remain attributable and a reinstall can be reconciled.
+model Shop {
+  id            String    @id @default(cuid())
+  domain        String    @unique
+  name          String?
+  contactEmail  String?
+  currencyCode  String?   @db.VarChar(3)
+  timezone      String?
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  settings      ShopSettings?
+  enquiries     Enquiry[]
+  products      ProductSnapshot[]
+  webhookEvents WebhookEvent[]
+  emailLogs     EmailLog[]
+
+  @@index([uninstalledAt])
+}
+
+model ShopSettings {
+  id                      String         @id @default(cuid())
+  shopId                  String         @unique
+  buttonEnabled           Boolean        @default(true)
+  buttonLabel             String         @default("Request a quote") @db.VarChar(80)
+  buttonBackgroundColor   String         @default("#111111") @db.VarChar(7)
+  buttonTextColor         String         @default("#FFFFFF") @db.VarChar(7)
+  visibilityMode          VisibilityMode @default(ALL_PRODUCTS)
+  visibleProductIds       String[]
+  visibleCollectionIds    String[]
+  requiredProductTags     String[]
+  requirePhone            Boolean        @default(false)
+  requireCompany          Boolean        @default(false)
+  requireMessage          Boolean        @default(false)
+  requireFile             Boolean        @default(false)
+  allowFileUpload         Boolean        @default(true)
+  adminNotificationEmails String[]
+  adminEmailSubject       String         @default("New quote request: {{product_title}}") @db.VarChar(200)
+  adminEmailBody          String         @default("A new quote request was submitted by {{customer_name}} for {{product_title}}.") @db.Text
+  customerEmailSubject    String         @default("We received your quote request") @db.VarChar(200)
+  customerEmailBody       String         @default("Thanks {{customer_name}}. We received your request and will contact you soon.") @db.Text
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+model Enquiry {
+  id              String        @id @default(cuid())
+  publicId        String        @unique @default(uuid()) @db.Uuid
+  shopId          String
+  status          EnquiryStatus @default(NEW)
+  source          EnquirySource @default(STOREFRONT)
+  customerName    String        @db.VarChar(160)
+  customerEmail   String        @db.VarChar(320)
+  customerPhone   String?       @db.VarChar(40)
+  companyName     String?       @db.VarChar(160)
+  quantity        Int
+  message         String?       @db.Text
+  productId       String
+  productHandle   String?       @db.VarChar(255)
+  productTitle    String        @db.VarChar(255)
+  productUrl      String?       @db.Text
+  productImageUrl String?       @db.Text
+  variantId       String?
+  variantTitle    String?       @db.VarChar(255)
+  sku             String?       @db.VarChar(255)
+  productPrice    Decimal?      @db.Decimal(19, 4)
+  currencyCode    String?       @db.VarChar(3)
+  locale          String?       @db.VarChar(35)
+  customerIpHash  String?       @db.VarChar(64)
+  userAgent       String?       @db.VarChar(512)
+  lastActivityAt  DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  shop        Shop                @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  attachments EnquiryAttachment[]
+  notes       EnquiryNote[]
+  activities  EnquiryActivity[]
+  emailLogs   EmailLog[]
+
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([shopId, status, createdAt(sort: Desc)])
+  @@index([shopId, productId])
+  @@index([shopId, customerEmail])
+  @@index([shopId, lastActivityAt(sort: Desc)])
+}
+
+model EnquiryAttachment {
+  id           String   @id @default(cuid())
+  enquiryId    String
+  storageKey   String   @unique
+  originalName String   @db.VarChar(255)
+  mimeType     String   @db.VarChar(127)
+  byteSize     Int
+  checksum     String?  @db.VarChar(64)
+  createdAt    DateTime @default(now())
+
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId])
+}
+
+model EnquiryNote {
+  id              String    @id @default(cuid())
+  enquiryId       String
+  body            String    @db.Text
+  authorShopifyId String?
+  authorName      String?   @db.VarChar(160)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId, createdAt(sort: Desc)])
+}
+
+model EnquiryActivity {
+  id             String       @id @default(cuid())
+  enquiryId      String
+  type           ActivityType
+  actorShopifyId String?
+  actorName      String?      @db.VarChar(160)
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId, createdAt(sort: Desc)])
+}
+
+/// Lightweight cache used for product-update webhook reconciliation, admin
+/// filters, and analytics without issuing a GraphQL request for every row.
+model ProductSnapshot {
+  id        String    @id @default(cuid())
+  shopId    String
+  productId String
+  handle    String?   @db.VarChar(255)
+  title     String    @db.VarChar(255)
+  imageUrl  String?   @db.Text
+  tags      String[]
+  status    String?   @db.VarChar(32)
+  deletedAt DateTime?
+  syncedAt  DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, productId])
+  @@index([shopId, title])
+  @@index([shopId, updatedAt(sort: Desc)])
+}
+
+model EmailLog {
+  id                String              @id @default(cuid())
+  shopId            String
+  enquiryId         String?
+  kind              EmailKind
+  status            EmailDeliveryStatus @default(PENDING)
+  recipient         String              @db.VarChar(320)
+  providerMessageId String?             @db.VarChar(255)
+  errorMessage      String?             @db.Text
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  shop    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  enquiry Enquiry? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([enquiryId])
+  @@index([status, createdAt])
+}
+
+/// Provides idempotency and an audit trail for Shopify webhook deliveries.
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  shopId      String?
+  webhookId   String    @unique
+  shopDomain  String
+  topic       String    @db.VarChar(100)
+  apiVersion  String?   @db.VarChar(20)
+  payload     Json?
+  processedAt DateTime?
+  failedAt    DateTime?
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  shop Shop? @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@index([shopDomain, topic, createdAt(sort: Desc)])
+  @@index([processedAt])
+}
+
+/// Fixed-window counters updated atomically by PostgreSQL. Keys are HMACs of
+/// tenant and network identifiers; raw customer IP addresses are never stored.
+model RateLimitBucket {
+  key         String   @id @db.VarChar(64)
+  count       Int      @default(1)
+  windowStart DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+}

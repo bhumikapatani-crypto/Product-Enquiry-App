@@ -1,0 +1,11 @@
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
+
+declare module "*.css";
+
+declare module "react" {
+  namespace JSX {
+    interface IntrinsicElements {
+      "s-app-nav": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
+    }
+  }
+}

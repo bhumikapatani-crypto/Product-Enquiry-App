@@ -1,0 +1,187 @@
+{% liquid
+  assign quote_product = block.settings.product | default: product
+  assign quote_variant = quote_product.selected_or_first_available_variant
+  assign should_render = block.settings.enabled
+
+  if quote_product == blank
+    assign should_render = false
+  endif
+
+  if block.settings.hide_when_unavailable and quote_product.available == false
+    assign should_render = false
+  endif
+
+  if block.settings.customers_only and customer == blank
+    assign should_render = false
+  endif
+
+  assign required_tag = block.settings.required_tag | strip
+  if required_tag != blank
+    unless quote_product.tags contains required_tag
+      assign should_render = false
+    endunless
+  endif
+%}
+
+{% if should_render %}
+  <quote-request
+    class="pqr"
+    data-block-id="{{ block.id | escape }}"
+    data-endpoint="/apps/product-enquiry/quote-requests"
+    data-file-max-bytes="{{ block.settings.max_file_size_mb | times: 1048576 }}"
+    {{ block.shopify_attributes }}
+  >
+    <button
+      class="pqr__trigger"
+      type="button"
+      aria-haspopup="dialog"
+      aria-controls="pqr-dialog-{{ block.id }}"
+      style="--pqr-button-bg: {{ block.settings.button_background }}; --pqr-button-color: {{ block.settings.button_text_color }}; --pqr-button-radius: {{ block.settings.button_radius }}px;"
+    >
+      {{ block.settings.button_label | escape }}
+    </button>
+
+    <dialog
+      class="pqr__dialog"
+      id="pqr-dialog-{{ block.id }}"
+      aria-labelledby="pqr-title-{{ block.id }}"
+    >
+      <div class="pqr__panel">
+        <div class="pqr__header">
+          <div>
+            <h2 class="pqr__title" id="pqr-title-{{ block.id }}">
+              {{ block.settings.modal_title | escape }}
+            </h2>
+            <p class="pqr__subtitle">{{ quote_product.title | escape }}</p>
+          </div>
+          <button class="pqr__close" type="button" aria-label="{{ 'quote_request.close' | t | escape }}" data-pqr-close>
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+
+        <form class="pqr__form" action="/apps/product-enquiry/quote-requests" method="post" enctype="multipart/form-data" novalidate data-pqr-form>
+          <input type="hidden" name="product_id" value="{{ quote_product.id }}">
+          <input type="hidden" name="product_handle" value="{{ quote_product.handle | escape }}">
+          <input type="hidden" name="product_title" value="{{ quote_product.title | escape }}">
+          <input type="hidden" name="variant_id" value="{{ quote_variant.id }}" data-pqr-variant-id>
+          <input type="hidden" name="product_url" value="{{ quote_product.url | escape }}">
+          <input type="hidden" name="locale" value="{{ request.locale.iso_code | escape }}">
+          <input class="pqr__honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+          <div class="pqr__product">
+            {% if quote_product.featured_image %}
+              {{ quote_product.featured_image
+                | image_url: width: 160
+                | image_tag:
+                  class: 'pqr__product-image',
+                  loading: 'lazy',
+                  widths: '80, 120, 160',
+                  sizes: '72px',
+                  alt: quote_product.featured_image.alt
+              }}
+            {% endif %}
+            <div>
+              <strong>{{ quote_product.title | escape }}</strong>
+              {% if quote_variant.title != 'Default Title' %}
+                <span class="pqr__variant" data-pqr-variant-title>{{ quote_variant.title | escape }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="pqr__grid">
+            <div class="pqr__field">
+              <label for="pqr-name-{{ block.id }}">{{ 'quote_request.name' | t }} <span aria-hidden="true">*</span></label>
+              <input id="pqr-name-{{ block.id }}" name="customer_name" type="text" value="{{ customer.name | escape }}" autocomplete="name" maxlength="160" required>
+            </div>
+            <div class="pqr__field">
+              <label for="pqr-email-{{ block.id }}">{{ 'quote_request.email' | t }} <span aria-hidden="true">*</span></label>
+              <input id="pqr-email-{{ block.id }}" name="customer_email" type="email" value="{{ customer.email | escape }}" autocomplete="email" maxlength="320" required>
+            </div>
+          </div>
+
+          <div class="pqr__grid">
+            <div class="pqr__field">
+              <label for="pqr-phone-{{ block.id }}">{{ 'quote_request.phone' | t }}{% if block.settings.require_phone %} <span aria-hidden="true">*</span>{% endif %}</label>
+              <input id="pqr-phone-{{ block.id }}" name="customer_phone" type="tel" autocomplete="tel" maxlength="40"{% if block.settings.require_phone %} required{% endif %}>
+            </div>
+            <div class="pqr__field">
+              <label for="pqr-company-{{ block.id }}">{{ 'quote_request.company' | t }}{% if block.settings.require_company %} <span aria-hidden="true">*</span>{% endif %}</label>
+              <input id="pqr-company-{{ block.id }}" name="company_name" type="text" autocomplete="organization" maxlength="160"{% if block.settings.require_company %} required{% endif %}>
+            </div>
+          </div>
+
+          <div class="pqr__field pqr__field--quantity">
+            <label for="pqr-quantity-{{ block.id }}">{{ 'quote_request.quantity' | t }} <span aria-hidden="true">*</span></label>
+            <input id="pqr-quantity-{{ block.id }}" name="quantity" type="number" value="1" min="1" max="1000000" inputmode="numeric" required>
+          </div>
+
+          <div class="pqr__field">
+            <label for="pqr-message-{{ block.id }}">{{ 'quote_request.message' | t }}{% if block.settings.require_message %} <span aria-hidden="true">*</span>{% endif %}</label>
+            <textarea id="pqr-message-{{ block.id }}" name="message" rows="4" maxlength="5000"{% if block.settings.require_message %} required{% endif %}></textarea>
+          </div>
+
+          {% if block.settings.allow_file %}
+            <div class="pqr__field">
+              <label for="pqr-file-{{ block.id }}">{{ 'quote_request.file' | t }}{% if block.settings.require_file %} <span aria-hidden="true">*</span>{% endif %}</label>
+              <input
+                id="pqr-file-{{ block.id }}"
+                name="attachment"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                {% if block.settings.require_file %}required{% endif %}
+              >
+              <small>{{ 'quote_request.file_help' | t: size: block.settings.max_file_size_mb }}</small>
+            </div>
+          {% endif %}
+
+          <div class="pqr__notice" role="status" aria-live="polite" hidden data-pqr-notice></div>
+
+          <div class="pqr__actions">
+            <button class="pqr__cancel" type="button" data-pqr-close>{{ 'quote_request.cancel' | t }}</button>
+            <button class="pqr__submit" type="submit" data-pqr-submit>
+              <span data-pqr-submit-label>{{ block.settings.submit_label | escape }}</span>
+              <span hidden data-pqr-loading>{{ 'quote_request.sending' | t }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  </quote-request>
+{% elsif request.design_mode %}
+  <div class="pqr__editor-placeholder" {{ block.shopify_attributes }}>
+    {{ 'quote_request.hidden_editor' | t }}
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Request a quote",
+  "target": "section",
+  "stylesheet": "quote-request.css",
+  "javascript": "quote-request.js",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    { "type": "checkbox", "id": "enabled", "label": "Show quote button", "default": true },
+    { "type": "product", "id": "product", "label": "Product", "autofill": true },
+    { "type": "text", "id": "required_tag", "label": "Only show for product tag", "info": "Leave blank to allow every product." },
+    { "type": "checkbox", "id": "hide_when_unavailable", "label": "Hide when product is unavailable", "default": false },
+    { "type": "checkbox", "id": "customers_only", "label": "Only show to signed-in customers", "default": false },
+    { "type": "header", "content": "Button" },
+    { "type": "text", "id": "button_label", "label": "Label", "default": "Request a quote" },
+    { "type": "color", "id": "button_background", "label": "Background", "default": "#111111" },
+    { "type": "color", "id": "button_text_color", "label": "Text", "default": "#ffffff" },
+    { "type": "range", "id": "button_radius", "label": "Corner radius", "min": 0, "max": 30, "step": 1, "unit": "px", "default": 6 },
+    { "type": "header", "content": "Form" },
+    { "type": "text", "id": "modal_title", "label": "Heading", "default": "Request a quote" },
+    { "type": "text", "id": "submit_label", "label": "Submit label", "default": "Send request" },
+    { "type": "checkbox", "id": "require_phone", "label": "Require phone", "default": false },
+    { "type": "checkbox", "id": "require_company", "label": "Require company", "default": false },
+    { "type": "checkbox", "id": "require_message", "label": "Require message", "default": false },
+    { "type": "checkbox", "id": "allow_file", "label": "Allow file upload", "default": true },
+    { "type": "checkbox", "id": "require_file", "label": "Require file", "default": false },
+    { "type": "range", "id": "max_file_size_mb", "label": "Maximum file size", "min": 1, "max": 10, "step": 1, "unit": "MB", "default": 5 }
+  ]
+}
+{% endschema %}
