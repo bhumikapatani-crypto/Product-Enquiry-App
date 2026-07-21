@@ -9,4 +9,5 @@ export const enquiryStyles = {
   settingsGrid: "enq-settings-grid", help: "enq-help", error: "enq-error", success: "enq-success",
   steps: "enq-steps", callout: "enq-callout", emailFlow: "enq-email-flow",
   formGrid: "enq-form-grid", checkbox: "enq-checkbox", actions: "enq-actions", statusBox: "enq-status-box",
+  toolbar: "enq-toolbar", pageNumbers: "enq-page-numbers", pageActive: "enq-page-active", pageEllipsis: "enq-page-ellipsis",
 } as const;

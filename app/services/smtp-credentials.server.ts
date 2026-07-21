@@ -14,9 +14,13 @@ export type SmtpConfiguration = {
 const VERSION = "v1";
 
 function encryptionKey() {
-  const secret = process.env.EMAIL_CREDENTIALS_ENCRYPTION_KEY?.trim();
+  // A dedicated key is preferred in production. Shopify CLI can regenerate a
+  // local .env while switching dev stores, so the stable app secret is a safe
+  // development fallback and remains server-only.
+  const secret = process.env.EMAIL_CREDENTIALS_ENCRYPTION_KEY?.trim()
+    || process.env.SHOPIFY_API_SECRET?.trim();
   if (!secret || secret.length < 32) {
-    throw new Error("EMAIL_CREDENTIALS_ENCRYPTION_KEY must contain at least 32 characters.");
+    throw new Error("Email credential encryption is not configured on the app server.");
   }
   return createHash("sha256").update(secret, "utf8").digest();
 }
