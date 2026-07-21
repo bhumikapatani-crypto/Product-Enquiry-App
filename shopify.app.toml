@@ -1,34 +1,33 @@
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "aa26e91e11514957716d20f6cf09eec8"
-name = "Product Enquiry & Quote"
+name = "Product Enquiry"
 application_url = "https://example.com"
 embedded = true
 
-[access_scopes]
-# Request only what the current features require. Future scope additions must be
-# justified by a feature and reviewed before deployment.
-scopes = "read_products,write_app_proxy"
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [webhooks]
-api_version = "2026-07"
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/scopes_update"
-  topics = [ "app/scopes_update" ]
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,write_metaobjects,write_metaobject_definitions"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
 
 [app_proxy]
 url = "/api/storefront"
-prefix = "apps"
 subpath = "product-enquiry"
-
-[build]
-include_config_on_deploy = true
-automatically_update_urls_on_dev = true
+prefix = "apps"
