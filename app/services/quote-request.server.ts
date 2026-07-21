@@ -31,7 +31,7 @@ export async function createQuoteRequest(args: CreateQuoteArgs) {
   const settings = await prisma.shopSettings.upsert({
     where: { shopId: shop.id },
     update: {},
-    create: { shopId: shop.id, visibleProductIds: [], visibleCollectionIds: [], requiredProductTags: [], adminNotificationEmails: catalog.shop.email ? [catalog.shop.email] : [] },
+    create: { shopId: shop.id, visibleProductIds: [], visibleCollectionIds: [], requiredProductTags: [], adminNotificationEmails: [] },
   });
   if (settings.requirePhone && !args.input.customerPhone) throw new RequiredFieldError("Phone is required.");
   if (settings.requireCompany && !args.input.companyName) throw new RequiredFieldError("Company is required.");
@@ -83,7 +83,17 @@ export async function createQuoteRequest(args: CreateQuoteArgs) {
       ["Attachment", storedAttachment?.originalName ?? "No attachment"],
     ];
     const detailsText = details.map(([label, value]) => `${label}: ${value}`).join("\n");
-    const recipients = settings.adminNotificationEmails.length ? settings.adminNotificationEmails : catalog.shop.email ? [catalog.shop.email] : [];
+    // Always notify Shopify's current store contact address. Keep additional
+    // configured recipients as copies, but de-duplicate them case-insensitively.
+    // This also handles a merchant changing their Store email after installing
+    // the app without requiring an uninstall or manual database update.
+    const recipients = Array.from(
+      new Map(
+        [catalog.shop.email, ...settings.adminNotificationEmails]
+          .filter((email): email is string => Boolean(email))
+          .map((email) => [email.toLowerCase(), email] as const),
+      ).values(),
+    );
     const results = await sendQuoteEmails([
       ...recipients.map((to) => ({
         kind: EmailKind.ADMIN_NOTIFICATION,
@@ -99,7 +109,7 @@ export async function createQuoteRequest(args: CreateQuoteArgs) {
         text: `${renderTemplate(settings.customerEmailBody, values)}\n\n${detailsText}`,
         html: buildEmailHtml("We received your quote request", `Thanks ${args.input.customerName}. We will review your request and contact you soon.`, details),
       },
-    ]);
+    ], settings);
     if (results.length) {
       await prisma.$transaction([
         prisma.emailLog.createMany({ data: results.map((result) => ({ shopId: shop.id, enquiryId: enquiry.id, kind: result.kind, status: result.success ? EmailDeliveryStatus.SENT : EmailDeliveryStatus.FAILED, recipient: result.to, providerMessageId: result.providerMessageId, errorMessage: result.error?.slice(0, 2_000), sentAt: result.success ? new Date() : null })) }),

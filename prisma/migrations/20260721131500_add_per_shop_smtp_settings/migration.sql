@@ -1,0 +1,11 @@
+ALTER TABLE "ShopSettings"
+ADD COLUMN "smtpEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "smtpHost" VARCHAR(255),
+ADD COLUMN "smtpPort" INTEGER NOT NULL DEFAULT 465,
+ADD COLUMN "smtpSecure" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "smtpUsername" VARCHAR(320),
+ADD COLUMN "smtpPasswordEncrypted" TEXT,
+ADD COLUMN "smtpFromName" VARCHAR(160),
+ADD COLUMN "smtpFromEmail" VARCHAR(320),
+ADD COLUMN "smtpLastTestedAt" TIMESTAMP(3),
+ADD COLUMN "smtpLastTestError" TEXT;
