@@ -121,6 +121,16 @@ model ShopSettings {
   adminEmailBody          String         @default("A new quote request was submitted by {{customer_name}} for {{product_title}}.") @db.Text
   customerEmailSubject    String         @default("We received your quote request") @db.VarChar(200)
   customerEmailBody       String         @default("Thanks {{customer_name}}. We received your request and will contact you soon.") @db.Text
+  smtpEnabled             Boolean        @default(false)
+  smtpHost                String?        @db.VarChar(255)
+  smtpPort                Int            @default(465)
+  smtpSecure              Boolean        @default(true)
+  smtpUsername            String?        @db.VarChar(320)
+  smtpPasswordEncrypted   String?        @db.Text
+  smtpFromName            String?        @db.VarChar(160)
+  smtpFromEmail           String?        @db.VarChar(320)
+  smtpLastTestedAt        DateTime?
+  smtpLastTestError       String?        @db.Text
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 

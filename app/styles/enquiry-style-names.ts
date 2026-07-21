@@ -6,4 +6,7 @@ export const enquiryStyles = {
   pagination: "enq-pagination", button: "enq-button", buttonPrimary: "enq-button-primary",
   detailGrid: "enq-detail-grid", card: "enq-card", details: "enq-details", product: "enq-product",
   note: "enq-note", noteMeta: "enq-note-meta", timeline: "enq-timeline", muted: "enq-muted", message: "enq-message",
+  settingsGrid: "enq-settings-grid", help: "enq-help", error: "enq-error", success: "enq-success",
+  steps: "enq-steps", callout: "enq-callout", emailFlow: "enq-email-flow",
+  formGrid: "enq-form-grid", checkbox: "enq-checkbox", actions: "enq-actions", statusBox: "enq-status-box",
 } as const;
